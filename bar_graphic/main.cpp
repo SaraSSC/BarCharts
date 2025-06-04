@@ -19,6 +19,8 @@
 #include <QVBoxLayout>
 #include <QPushButton>
 
+#include <QSettings>
+
 
 QT_USE_NAMESPACE
 
@@ -47,7 +49,7 @@ int main(int argc, char *argv[])
     *set0 << 10;
     *set1 << 5;
     *set2 << 6;
-    *set3 << 170;
+    *set3 << 70;
     *set4 << 30;
 
 
@@ -232,10 +234,14 @@ int main(int argc, char *argv[])
             }
         }
         bool totalOutOfRange = (total < 0 || total > 100);
-        totalLabel->setText(QString("Total value: %1%2")
+        totalLabel->setText(QString("Total value: %1%2 %")
                                 .arg(total)
                                 .arg(totalOutOfRange ? " (Out of range!)" : ""));
         totalLabel->setStyleSheet(totalOutOfRange ? "color: red; font-weight: bold" : "");
+
+
+
+
     };
 
     // Connect bar clicks
@@ -277,6 +283,47 @@ int main(int argc, char *argv[])
     firstChartLayout->addWidget(plusButton);
     firstChartLayout->addWidget(minusButton);
 
+    plusButton->animateClick();
+    minusButton->animateClick();
+
+    plusButton->setStyleSheet(
+        "QPushButton:hover { background-color: #cccccc; }"
+        );
+    minusButton->setStyleSheet(
+        "QPushButton:hover { background-color: #cccccc; }"
+        );
+
+    // Save bar values before exit
+    QObject::connect(&a, &QApplication::aboutToQuit, [&](){
+        QSettings settings("YourCompany", "YourApp");
+        for (int i = 0; i < sets.size(); ++i) {
+            settings.beginGroup(QString("BarSet%1").arg(i));
+            QBarSet* set = sets[i];
+            settings.setValue("label", set->label());
+            QVariantList values;
+            for (int j = 0; j < set->count(); ++j) {
+                values << set->at(j);
+            }
+            settings.setValue("values", values);
+            settings.endGroup();
+        }
+    });
+
+    // Restore bar values on startup
+    QSettings settings("YourCompany", "YourApp");
+    for (int i = 0; i < sets.size(); ++i) {
+        settings.beginGroup(QString("BarSet%1").arg(i));
+        QVariantList values = settings.value("values").toList();
+        if (!values.isEmpty()) {
+            sets[i]->remove(0, sets[i]->count()); // Clear old values
+            for (const QVariant& v : values) {
+                *(sets[i]) << v.toReal();
+            }
+        }
+        settings.endGroup();
+    }
+
+    updateTotalLabel();
     return a.exec();
 
 
