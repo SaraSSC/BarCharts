@@ -7,7 +7,6 @@
 #include <QtCharts/QLegend>
 #include <QtCharts/QBarSet>
 #include <QtCharts/QBarCategoryAxis>
-#include <QtCharts/QHorizontalStackedBarSeries>
 #include <QtCharts/QLineSeries>
 #include <QtCharts/QCategoryAxis>
 #include <QtCharts/QHorizontalBarSeries>
@@ -16,12 +15,20 @@
 #include <QDebug>
 #include <QMessageBox>
 
+#include <QLabel>
+#include <QVBoxLayout>
+#include <QPushButton>
+
 
 QT_USE_NAMESPACE
 
 
 int main(int argc, char *argv[])
 {
+    QBarSet* selectedSet = nullptr;
+    int selectedIndex = -1;
+
+
     // -------------First Chart---------------//
     QApplication a(argc,argv);
     QBarSet *set0 = new QBarSet("Altuve");
@@ -32,16 +39,21 @@ int main(int argc, char *argv[])
 
 
     QValueAxis *valueAxis =  new QValueAxis();
-    valueAxis->setRange(0, 100);
+    valueAxis->setRange(0, 100); //def the max and min values on the chart's legend
     valueAxis->setTickCount(11);
     valueAxis->setLabelFormat("%d");
 
+    //Adding the values to each bar
     *set0 << 10;
     *set1 << 5;
     *set2 << 6;
     *set3 << 170;
     *set4 << 30;
 
+
+
+
+    //def the max and min values for them and user warning
     QList<QBarSet*> sets = {set0, set1, set2, set3, set4};
     QString message;
     for(QBarSet* set : sets){
@@ -62,7 +74,7 @@ int main(int argc, char *argv[])
         QMessageBox::information(nullptr, "Out of Range Values", message);
     }
 
-   //BarSeries *series = new QBarSeries();
+
     QHorizontalBarSeries *series = new QHorizontalBarSeries();
     series->append(set0);
     series->append(set1);
@@ -70,14 +82,13 @@ int main(int argc, char *argv[])
     series->append(set3);
     series->append(set4);
 
+    series->setLabelsVisible(true);
+
     QChart *chart = new QChart();
 
     //Adding the chart
     chart->addSeries(series);
 
-    //Title and Animaitions
-    chart->setTitle("Battling Avg of the Year");
-    chart->setAnimationOptions(QChart::AllAnimations);
 
     //Placing the category titles
     QStringList categories;
@@ -94,9 +105,36 @@ int main(int argc, char *argv[])
     series->attachAxis(axis);
     series->attachAxis(valueAxis);
 
+    //Calculate the total of the bars
+    qreal total = 0;
+    for (QBarSet* set : sets){
+        for (int i = 0; i < set->count(); i++){
+            total += (*set)[i];
+        };
+    };
+
+
+    //Check if total is out range
+    bool totalOutOfRange = (total < 0 || total > 100);
+
     //Bar Chart Axis
     chart->setAxisY(axis, series);
     chart->setAxisX(valueAxis, series);
+
+
+    //Title and Animaitions
+    chart->setTitle("Battling Avg of the Year");
+    chart->setAnimationOptions(QChart::AllAnimations);
+    QFont labelFont;
+    labelFont.setBold(true);
+
+    QLabel *totalLabel = new QLabel(QString("Total value: %1")
+                             .arg(total));
+    if (totalOutOfRange){
+        totalLabel->setStyleSheet("color: red; font-weight: bold");
+        totalLabel->setText(totalLabel->text() + "(Out of range!)");
+    }
+
 
     QPalette pal = qApp->palette();
     pal.setColor(QPalette::Window,QRgb(0xffffff));
@@ -106,9 +144,7 @@ int main(int argc, char *argv[])
 
 
 
-    // Used to display the chart
-    QChartView *chartView1= new QChartView(chart);
-    chartView1->setRenderHint(QPainter::Antialiasing);
+
 
 
     // -------------Second Chart---------------//
@@ -128,6 +164,10 @@ int main(int argc, char *argv[])
     chart2->setTitle("Play Vertical Bar Chart");
     chart2->setAnimationOptions(QChart::AllAnimations);
 
+    // Used to display the second chart
+    QChartView *chartView2 = new QChartView(chart2);
+    chartView2->setRenderHint(QPainter::Antialiasing);
+
     QBarCategoryAxis *axis2 = new QBarCategoryAxis();
     axis2->append(categories);
     chart2->createDefaultAxes();
@@ -135,24 +175,107 @@ int main(int argc, char *argv[])
     chart2->legend()->setAlignment(Qt::AlignBottom);
     series2->attachAxis(axis2);
     chart2->setAxisX(axis2, series2);
-
-    QChartView *chartView2 = new QChartView(chart2);
     chartView2->setRenderHint(QPainter::Antialiasing);
 
     // Create the main app window
     QMainWindow window;
 
+    //Used to display the first chart
+    QChartView *chartView1 = new QChartView(chart);
+    chartView1->setRenderHint(QPainter::Antialiasing);
+
+    // Layout for first chart and its total label (vertical)
+    QVBoxLayout *firstChartLayout = new QVBoxLayout();
+    firstChartLayout->addWidget(chartView1);
+    firstChartLayout->addWidget(totalLabel);
+
+    QWidget *firstChartWidget = new QWidget();
+    firstChartWidget->setLayout(firstChartLayout);
 
 
+
+    // Main layout: horizontal for both charts
     QWidget *centralWidget = new QWidget();
-    QHBoxLayout *layout = new QHBoxLayout(centralWidget);
-    layout->addWidget(chartView1);
-    layout->addWidget(chartView2);
+    QHBoxLayout *mainLayout = new QHBoxLayout(centralWidget);
+    mainLayout->addWidget(firstChartWidget);
+    mainLayout->addWidget(chartView2);
+
+
+
+    // Create + and - buttons
+    QPushButton *plusButton = new QPushButton("+");
+    QPushButton *minusButton = new QPushButton("-");
+
+    for (QBarSet* set : sets){
+        QObject::connect(set, &QBarSet::clicked, [&](int index){
+            selectedSet = set;
+            selectedIndex = index;
+        });
+    }
+
+    // Highlight function
+    auto highlightSelectedBar = [&]() {
+        for (QBarSet* set : sets) {
+            set->setColor(Qt::blue); // Default color
+        }
+        if (selectedSet) {
+            selectedSet->setColor(Qt::red); // Highlight selected
+        }
+    };
+
+    // Update total label function
+    auto updateTotalLabel = [&]() {
+        qreal total = 0;
+        for (QBarSet* set : sets){
+            for (int i = 0; i < set->count(); i++){
+                total += set->at(i);
+            }
+        }
+        bool totalOutOfRange = (total < 0 || total > 100);
+        totalLabel->setText(QString("Total value: %1%2")
+                                .arg(total)
+                                .arg(totalOutOfRange ? " (Out of range!)" : ""));
+        totalLabel->setStyleSheet(totalOutOfRange ? "color: red; font-weight: bold" : "");
+    };
+
+    // Connect bar clicks
+    for (QBarSet* set : sets){
+        QObject::connect(set, &QBarSet::clicked, [&, set](int index){
+            selectedSet = set;
+            selectedIndex = index;
+            highlightSelectedBar();
+            updateTotalLabel();
+        });
+    }
+
+    // Connect buttons
+    QObject::connect(plusButton, &QPushButton::clicked, [&](){
+        if (selectedSet && selectedIndex >= 0) {
+            qreal value = selectedSet->at(selectedIndex);
+            selectedSet->replace(selectedIndex, value + 1);
+            series->setLabelsVisible(true);
+            chartView1->update();
+            updateTotalLabel();
+        }
+    });
+    QObject::connect(minusButton, &QPushButton::clicked, [&](){
+        if (selectedSet && selectedIndex >= 0) {
+            qreal value = selectedSet->at(selectedIndex);
+            selectedSet->replace(selectedIndex, value - 1);
+            series->setLabelsVisible(true);
+            chartView1->update();
+            updateTotalLabel();
+        }
+    });
 
     // Set the main window widget
     window.setCentralWidget(centralWidget);
-    window.resize(900,400);
+    window.resize(900, 400);
     window.show();
+
+    // Add buttons below the total label in firstChartLayout
+    firstChartLayout->addWidget(plusButton);
+    firstChartLayout->addWidget(minusButton);
 
     return a.exec();
 
