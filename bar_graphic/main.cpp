@@ -35,6 +35,7 @@ int main(int argc, char *argv[])
     QApplication a(argc,argv);
     QBarSet *set0 = new QBarSet("Altuve");
     QBarSet *set1 = new QBarSet("Martins");
+
     QBarSet *set2 = new QBarSet("Laranjeira");
     QBarSet *set3 = new QBarSet("Duarte");
     QBarSet *set4 = new QBarSet("Jerónimo");
@@ -46,12 +47,11 @@ int main(int argc, char *argv[])
     valueAxis->setLabelFormat("%d");
 
     //Adding the values to each bar
-    *set0 << 10;
-    *set1 << 5;
-    *set2 << 6;
-    *set3 << 70;
-    *set4 << 30;
-
+    *set0 << 100;
+    *set1 << 0;
+    *set2 << 0;
+    *set3 << 0;
+    *set4 << 0;
 
 
 
@@ -80,6 +80,7 @@ int main(int argc, char *argv[])
     QHorizontalBarSeries *series = new QHorizontalBarSeries();
     series->append(set0);
     series->append(set1);
+
     series->append(set2);
     series->append(set3);
     series->append(set4);
@@ -240,9 +241,20 @@ int main(int argc, char *argv[])
         totalLabel->setStyleSheet(totalOutOfRange ? "color: red; font-weight: bold" : "");
 
 
-
-
     };
+    // Check if we can increment without exceeding 100
+    if (total < 100) {
+        qreal value = selectedSet->at(selectedIndex);
+        qreal increment = qMin(1.0, 100.0 - total); // Don't exceed 100
+        selectedSet->replace(selectedIndex, value + increment);
+        series->setLabelsVisible(true);
+        chartView1->update();
+        updateTotalLabel();
+    } else {
+        // Optional: show message that total is at maximum
+        QMessageBox::information(nullptr, "Maximum Reached",
+                                 "Total value is already at maximum (100).");
+    }
 
     // Connect bar clicks
     for (QBarSet* set : sets){
@@ -254,26 +266,156 @@ int main(int argc, char *argv[])
         });
     }
 
-    // Connect buttons
+    /**********Fixed at 100 max single bar movement*******/
+    // Connect plus button
     QObject::connect(plusButton, &QPushButton::clicked, [&](){
         if (selectedSet && selectedIndex >= 0) {
-            qreal value = selectedSet->at(selectedIndex);
-            selectedSet->replace(selectedIndex, value + 1);
-            series->setLabelsVisible(true);
-            chartView1->update();
-            updateTotalLabel();
-        }
-    });
-    QObject::connect(minusButton, &QPushButton::clicked, [&](){
-        if (selectedSet && selectedIndex >= 0) {
-            qreal value = selectedSet->at(selectedIndex);
-            selectedSet->replace(selectedIndex, value - 1);
-            series->setLabelsVisible(true);
-            chartView1->update();
-            updateTotalLabel();
+            // Calculate current total
+            qreal total = 0;
+            for (QBarSet* set : sets) {
+                for (int i = 0; i < set->count(); i++) {
+                    total += set->at(i);
+                }
+            }
+
+            // Check if we can increment without exceeding 100
+            if (total < 100) {
+                qreal value = selectedSet->at(selectedIndex);
+                qreal increment = qMin(1.0, 100.0 - total); // Don't exceed 100
+                selectedSet->replace(selectedIndex, value + increment);
+                series->setLabelsVisible(true);
+                chartView1->update();
+                updateTotalLabel();
+            } else {
+                // Optional: show message that total is at maximum
+                QMessageBox::information(nullptr, "Maximum Reached",
+                                         "Total value is already at maximum (100).");
+            }
         }
     });
 
+    // Connect minus button
+    QObject::connect(minusButton, &QPushButton::clicked, [&](){
+        if (selectedSet && selectedIndex >= 0) {
+            qreal value = selectedSet->at(selectedIndex);
+            if (value > 0) { // Don't go below 0
+                selectedSet->replace(selectedIndex, value - 1);
+                series->setLabelsVisible(true);
+                chartView1->update();
+                updateTotalLabel();
+            }
+        }
+    });
+
+
+    // Max value to be always at 100
+
+    /*********Dynamic bars**********/
+   /* // Connect plus button
+    QObject::connect(plusButton, &QPushButton::clicked, [&](){
+        if (selectedSet && selectedIndex >= 0) {
+            // Calculate current total FIRST
+            qreal currentTotal = 0;
+            for (QBarSet* set : sets) {
+                for (int i = 0; i < set->count(); i++) {
+                    currentTotal += set->at(i);
+                }
+            }
+
+            // Only proceed if the total is less than 100
+            if (currentTotal < 100) {
+                // Get current value
+                qreal value = selectedSet->at(selectedIndex);
+                qreal increment = qMin(1.0, 100.0 - currentTotal); // Don't exceed 100
+
+                // Check if we can increment this value
+                if (value + increment <= 100) {
+                    // Get number of other bars
+                    int otherBarsCount = 0;
+                    qreal totalOtherBars = 0;
+                    for (QBarSet* set : sets) {
+                        for (int i = 0; i < set->count(); i++) {
+                            if (set != selectedSet || i != selectedIndex) {
+                                otherBarsCount++;
+                                totalOtherBars += set->at(i);
+                            }
+                        }
+                    }
+
+                    // Only proceed if there are other bars with values to decrease
+                    if (otherBarsCount > 0 && totalOtherBars >= increment) {
+                        // Increase selected bar
+                        selectedSet->replace(selectedIndex, value + increment);
+
+                        // Calculate how much to decrease per other bar
+                        qreal decreasePerBar = increment / otherBarsCount;
+
+                        // Decrease other bars proportionally
+                        for (QBarSet* set : sets) {
+                            for (int i = 0; i < set->count(); i++) {
+                                if (set != selectedSet || i != selectedIndex) {
+                                    qreal currentValue = set->at(i);
+                                    qreal newValue = qMax(0.0, currentValue - decreasePerBar);
+                                    set->replace(i, newValue);
+                                }
+                            }
+                        }
+
+                        series->setLabelsVisible(true);
+                        chartView1->update();
+                        updateTotalLabel();
+                    }
+                }
+            } else {
+                // Show message that total is at maximum
+                QMessageBox::information(nullptr, "Maximum Reached",
+                                         "Total value is already at maximum (100).");
+            }
+        }
+    });
+
+    // Connect minus button
+    QObject::connect(minusButton, &QPushButton::clicked, [&](){
+        if (selectedSet && selectedIndex >= 0) {
+            // Get current value
+            qreal value = selectedSet->at(selectedIndex);
+            qreal decrement = 1.0;
+
+            // Check if we can decrement this value
+            if (value - decrement >= 0) {
+                // Decrease selected bar
+                selectedSet->replace(selectedIndex, value - decrement);
+
+                // Calculate how much to increase per other bar
+                int otherBarsCount = 0;
+                for (QBarSet* set : sets) {
+                    for (int i = 0; i < set->count(); i++) {
+                        if (set != selectedSet || i != selectedIndex) {
+                            otherBarsCount++;
+                        }
+                    }
+                }
+
+                qreal increasePerBar = decrement / otherBarsCount;
+
+                // Increase other bars proportionally
+                for (QBarSet* set : sets) {
+                    for (int i = 0; i < set->count(); i++) {
+                        if (set != selectedSet || i != selectedIndex) {
+                            qreal currentValue = set->at(i);
+                            qreal newValue = qMin(100.0, currentValue + increasePerBar);
+                            set->replace(i, newValue);
+                        }
+                    }
+                }
+
+                series->setLabelsVisible(true);
+                chartView1->update();
+                updateTotalLabel();
+            }
+        }
+    });
+*/
     // Set the main window widget
     window.setCentralWidget(centralWidget);
     window.resize(900, 400);
@@ -322,6 +464,44 @@ int main(int argc, char *argv[])
         }
         settings.endGroup();
     }
+
+    // Create the reset button
+    QPushButton *resetButton = new QPushButton("Reset");
+    resetButton->setStyleSheet(
+        "QPushButton:hover { background-color: #cccccc; }"
+        );
+
+    // Connect reset button to restore default values
+    QObject::connect(resetButton, &QPushButton::clicked, [&](){
+        // Reset values to 100, 0, 0, 0, 0
+        set0->replace(0, 100);
+        set1->replace(0, 0);
+        set2->replace(0, 0);
+        set3->replace(0, 0);
+        set4->replace(0, 0);
+
+        // Reset colors
+        for (QBarSet* set : sets) {
+            set->setColor(Qt::blue);
+        }
+
+        // Reset selection
+        selectedSet = nullptr;
+        selectedIndex = -1;
+
+        // Update the chart and total label
+        series->setLabelsVisible(true);
+        chartView1->update();
+        updateTotalLabel();
+
+        // Inform the user
+        QMessageBox::information(nullptr, "Values Reset",
+                                 "All values have been reset to their defaults.");
+    });
+
+    // Add the reset button to the layout
+    firstChartLayout->addWidget(resetButton);
+
 
     updateTotalLabel();
     return a.exec();
