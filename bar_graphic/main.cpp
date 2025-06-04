@@ -13,6 +13,8 @@
 #include <QtCharts/QHorizontalBarSeries>
 
 #include <QHBoxLayout>
+#include <QDebug>
+#include <QMessageBox>
 
 
 QT_USE_NAMESPACE
@@ -20,6 +22,7 @@ QT_USE_NAMESPACE
 
 int main(int argc, char *argv[])
 {
+    // -------------First Chart---------------//
     QApplication a(argc,argv);
     QBarSet *set0 = new QBarSet("Altuve");
     QBarSet *set1 = new QBarSet("Martins");
@@ -28,11 +31,36 @@ int main(int argc, char *argv[])
     QBarSet *set4 = new QBarSet("Jerónimo");
 
 
-    *set0 << 326; // Example: average or any single value
-    *set1 << 298;
-    *set2 << 290;
-    *set3 << 271;
-    *set4 << 307;
+    QValueAxis *valueAxis =  new QValueAxis();
+    valueAxis->setRange(0, 100);
+    valueAxis->setTickCount(11);
+    valueAxis->setLabelFormat("%d");
+
+    *set0 << 10;
+    *set1 << 5;
+    *set2 << 6;
+    *set3 << 170;
+    *set4 << 30;
+
+    QList<QBarSet*> sets = {set0, set1, set2, set3, set4};
+    QString message;
+    for(QBarSet* set : sets){
+        for (int i= 0; i < set->count();i++){
+            qreal value = (*set)[i];
+            if (value > 100){
+                message += QString("%1 value is greater than 100: %2\n")
+                .arg(set->label()).arg(value);
+            } else if (value < 0) {
+                message += QString("%1 value is less than 0: %2\n")
+                .arg(set->label()).arg(value);
+            }
+        }
+    }
+
+    // Show message if any out-of-range values found
+    if (!message.isEmpty()) {
+        QMessageBox::information(nullptr, "Out of Range Values", message);
+    }
 
    //BarSeries *series = new QBarSeries();
     QHorizontalBarSeries *series = new QHorizontalBarSeries();
@@ -55,6 +83,8 @@ int main(int argc, char *argv[])
     QStringList categories;
     categories << "2013";
 
+
+
     //Ads it to the axis
     QBarCategoryAxis *axis = new QBarCategoryAxis();
     axis->append(categories);
@@ -62,12 +92,11 @@ int main(int argc, char *argv[])
     chart->legend()->setVisible(true);
     chart->legend()->setAlignment(Qt::AlignBottom);
     series->attachAxis(axis);
+    series->attachAxis(valueAxis);
 
-    //Bar chart
-   //hart->setAxisX(axis, series);
-
-    //Stacked Bar Chart
+    //Bar Chart Axis
     chart->setAxisY(axis, series);
+    chart->setAxisX(valueAxis, series);
 
     QPalette pal = qApp->palette();
     pal.setColor(QPalette::Window,QRgb(0xffffff));
@@ -82,7 +111,7 @@ int main(int argc, char *argv[])
     chartView1->setRenderHint(QPainter::Antialiasing);
 
 
-    // ----------------------------//
+    // -------------Second Chart---------------//
 
     QBarSet *setA = new QBarSet("Player A");
     QBarSet *setB = new QBarSet("Player B");
