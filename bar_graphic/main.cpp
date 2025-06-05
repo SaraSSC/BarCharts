@@ -20,7 +20,7 @@
 #include <QPushButton>
 
 #include <QSettings>
-
+#include <QComboBox>
 
 QT_USE_NAMESPACE
 
@@ -37,8 +37,8 @@ int main(int argc, char *argv[])
     QBarSet *set1 = new QBarSet("Martins");
 
     QBarSet *set2 = new QBarSet("Laranjeira");
-    QBarSet *set3 = new QBarSet("Duarte");
-    QBarSet *set4 = new QBarSet("Jerónimo");
+
+
 
 
     QValueAxis *valueAxis =  new QValueAxis();
@@ -47,16 +47,16 @@ int main(int argc, char *argv[])
     valueAxis->setLabelFormat("%d");
 
     //Adding the values to each bar
-    *set0 << 100;
+    *set0 << 0;
     *set1 << 0;
-    *set2 << 0;
-    *set3 << 0;
-    *set4 << 0;
+    *set2 << 100;
+
+
 
 
 
     //def the max and min values for them and user warning
-    QList<QBarSet*> sets = {set0, set1, set2, set3, set4};
+    QList<QBarSet*> sets = {set0, set1, set2};
     QString message;
     for(QBarSet* set : sets){
         for (int i= 0; i < set->count();i++){
@@ -82,8 +82,8 @@ int main(int argc, char *argv[])
     series->append(set1);
 
     series->append(set2);
-    series->append(set3);
-    series->append(set4);
+
+
 
     series->setLabelsVisible(true);
 
@@ -132,7 +132,7 @@ int main(int argc, char *argv[])
     labelFont.setBold(true);
 
     QLabel *totalLabel = new QLabel(QString("Total value: %1")
-                             .arg(total));
+                                        .arg(total));
     if (totalOutOfRange){
         totalLabel->setStyleSheet("color: red; font-weight: bold");
         totalLabel->setText(totalLabel->text() + "(Out of range!)");
@@ -180,6 +180,9 @@ int main(int argc, char *argv[])
     chart2->setAxisX(axis2, series2);
     chartView2->setRenderHint(QPainter::Antialiasing);
 
+
+
+    // -------------Layout---------------//
     // Create the main app window
     QMainWindow window;
 
@@ -266,7 +269,9 @@ int main(int argc, char *argv[])
         });
     }
 
-    /**********Fixed at 100 max single bar movement*******/
+
+    //---------- Bars single bar movement -----------//
+    /*
     // Connect plus button
     QObject::connect(plusButton, &QPushButton::clicked, [&](){
         if (selectedSet && selectedIndex >= 0) {
@@ -307,11 +312,13 @@ int main(int argc, char *argv[])
         }
     });
 
+*/
 
-    // Max value to be always at 100
+    // Value to be always at 100
 
-    /*********Dynamic bars**********/
-   /* // Connect plus button
+    // -------------Dynamic Bars---------------//
+    // Connect plus button
+
     QObject::connect(plusButton, &QPushButton::clicked, [&](){
         if (selectedSet && selectedIndex >= 0) {
             // Calculate current total FIRST
@@ -322,54 +329,40 @@ int main(int argc, char *argv[])
                 }
             }
 
-            // Only proceed if the total is less than 100
-            if (currentTotal < 100) {
-                // Get current value
+            // Ensure the total is 100 before redistributing
+            if (currentTotal == 100) {
+                // Get current value of the selected bar
                 qreal value = selectedSet->at(selectedIndex);
-                qreal increment = qMin(1.0, 100.0 - currentTotal); // Don't exceed 100
+                qreal increment = 1.0; // Increment by 1 unit
 
                 // Check if we can increment this value
                 if (value + increment <= 100) {
-                    // Get number of other bars
-                    int otherBarsCount = 0;
-                    qreal totalOtherBars = 0;
+                    // Increase the selected bar
+                    selectedSet->replace(selectedIndex, value + increment);
+
+                    // Calculate the total decrement needed
+                    qreal decrementNeeded = increment;
+
+                    // Redistribute the decrement proportionally among other bars
                     for (QBarSet* set : sets) {
                         for (int i = 0; i < set->count(); i++) {
                             if (set != selectedSet || i != selectedIndex) {
-                                otherBarsCount++;
-                                totalOtherBars += set->at(i);
+                                qreal currentValue = set->at(i);
+                                qreal decrement = (currentValue / (currentTotal - value)) * decrementNeeded;
+                                set->replace(i, qMax(0.0, currentValue - decrement));
                             }
                         }
                     }
 
-                    // Only proceed if there are other bars with values to decrease
-                    if (otherBarsCount > 0 && totalOtherBars >= increment) {
-                        // Increase selected bar
-                        selectedSet->replace(selectedIndex, value + increment);
-
-                        // Calculate how much to decrease per other bar
-                        qreal decreasePerBar = increment / otherBarsCount;
-
-                        // Decrease other bars proportionally
-                        for (QBarSet* set : sets) {
-                            for (int i = 0; i < set->count(); i++) {
-                                if (set != selectedSet || i != selectedIndex) {
-                                    qreal currentValue = set->at(i);
-                                    qreal newValue = qMax(0.0, currentValue - decreasePerBar);
-                                    set->replace(i, newValue);
-                                }
-                            }
-                        }
-
-                        series->setLabelsVisible(true);
-                        chartView1->update();
-                        updateTotalLabel();
-                    }
+                    // Update the chart and total label
+                    series->setLabelsVisible(true);
+                    chartView1->update();
+                    updateTotalLabel();
                 }
             } else {
-                // Show message that total is at maximum
-                QMessageBox::information(nullptr, "Maximum Reached",
-                                         "Total value is already at maximum (100).");
+                // Show message if total is not 100
+                QMessageBox::information(nullptr, "Invalid Operation",
+                                         "Total value must be 100 to redistribute values.");
             }
         }
     });
@@ -415,10 +408,13 @@ int main(int argc, char *argv[])
             }
         }
     });
-*/
+
+
+    // -------------Layout---------------//
+
     // Set the main window widget
     window.setCentralWidget(centralWidget);
-    window.resize(900, 400);
+    window.resize(1000, 500);
     window.show();
 
     // Add buttons below the total label in firstChartLayout
@@ -473,12 +469,11 @@ int main(int argc, char *argv[])
 
     // Connect reset button to restore default values
     QObject::connect(resetButton, &QPushButton::clicked, [&](){
-        // Reset values to 100, 0, 0, 0, 0
-        set0->replace(0, 100);
+        // Reset values to 100, 0, 0
+        set0->replace(0, 0);
         set1->replace(0, 0);
-        set2->replace(0, 0);
-        set3->replace(0, 0);
-        set4->replace(0, 0);
+        set2->replace(0, 100);
+
 
         // Reset colors
         for (QBarSet* set : sets) {
@@ -501,6 +496,47 @@ int main(int argc, char *argv[])
 
     // Add the reset button to the layout
     firstChartLayout->addWidget(resetButton);
+
+
+    /*TODO: adding the relative and absolute
+            bars to incremente and decrement the relative value
+            label to each bar with the relative value
+             */
+
+    QComboBox *barSelector = new QComboBox();
+    barSelector->addItem("Altuve");
+    barSelector->addItem("Martins");
+    barSelector->addItem("Laranjeira");
+
+
+    barSelector->setCurrentIndex(0);
+
+    //Connect the combobox selection to highlight the bar we are selectiing
+    QObject::connect(barSelector, QOverload<int>::of(&QComboBox::currentIndexChanged),
+                     [&](int index){
+                         if (index >= 0 && index < sets.size()){
+                            selectedSet = sets[index];
+                            selectedIndex = 0;
+                            highlightSelectedBar;
+                         };
+
+    });
+
+    // Add a label to the combobox in the layout
+    QLabel *selectedLabel = new QLabel("Select a bar:");
+    QHBoxLayout *selectorLayout = new QHBoxLayout();
+    selectorLayout->addWidget(selectedLabel);
+    selectorLayout->addWidget(barSelector);
+
+    QWidget *selectorWidget = new QWidget();
+    selectorWidget->setLayout(selectorLayout);
+
+    //Rearange the layout
+    firstChartLayout->addWidget(selectorWidget);
+    firstChartLayout->addWidget(plusButton);
+    firstChartLayout->addWidget(minusButton);
+
+
 
 
     updateTotalLabel();
